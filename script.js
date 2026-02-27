@@ -25,6 +25,8 @@
   }
 
   const header = document.getElementById("top-header");
+  const skillsCanvas = document.getElementById("skillsCanvas");
+  const skillsCenter = document.getElementById("skillsCenter");
   const navLinks = Array.from(document.querySelectorAll(".site-nav a"));
   const sections = gsap.utils.toArray(".section");
   let lastY = window.scrollY;
@@ -49,6 +51,10 @@
   updateHeaderState();
   window.addEventListener("scroll", updateHeaderState, { passive: true });
 
+  const getHeaderOffset = () => {
+    return header ? header.offsetHeight + 12 : 88;
+  };
+
   navLinks.forEach((link) => {
     const targetId = link.getAttribute("href");
     const target = targetId ? document.querySelector(targetId) : null;
@@ -66,11 +72,12 @@
 
       if (lenis) {
         lenis.scrollTo(target, {
-          offset: -88,
+          offset: -getHeaderOffset(),
           duration: 1.1
         });
       } else {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        const top = target.getBoundingClientRect().top + window.pageYOffset - getHeaderOffset();
+        window.scrollTo({ top, behavior: "smooth" });
       }
     });
 
@@ -130,6 +137,8 @@
       }
     });
   });
+
+  initializeSkillsCanvas();
 
   sections.forEach((section) => {
     const isReverse = section.classList.contains("reverse");
@@ -230,4 +239,175 @@
       }
     });
   });
+
+  document.querySelectorAll(".metric-bar").forEach((metricBar) => {
+    const fill = metricBar.querySelector("span");
+    const progress = Number(metricBar.dataset.progress || 0);
+
+    if (!fill) {
+      return;
+    }
+
+    gsap.to(fill, {
+      width: `${Math.max(0, Math.min(100, progress))}%`,
+      duration: 1.25,
+      ease: "power2.out",
+      scrollTrigger: {
+        trigger: metricBar.closest(".section") || metricBar,
+        start: "top 80%",
+        once: true
+      }
+    });
+  });
+
+  function initializeSkillsCanvas() {
+    if (!skillsCanvas || !skillsCenter) {
+      return;
+    }
+
+    const iconPool = [
+      "assets/images/icon-intelligence.svg",
+      "assets/images/icon-automation.svg",
+      "assets/images/icon-infrastructure.svg",
+      "assets/images/icon-leadership.svg"
+    ];
+    const defaultLabel = skillsCenter.textContent.trim();
+    const techSkills = [
+      "Python",
+      "Django",
+      "Flask",
+      "PyTorch AI infrastructure",
+      "MongoDB",
+      "Elasticsearch",
+      "Vector database infrastructure",
+      "Docker",
+      "Kubernetes",
+      "AWS Cloud Infrastructure",
+      "AWS S3",
+      "AWS Lambda",
+      "Google Cloud Platform",
+      "Redis"
+    ];
+    const uniqueSkills = Array.from(new Set(techSkills));
+    let floatingTweens = [];
+    let resizeTimer = null;
+
+    if (!uniqueSkills.length) {
+      return;
+    }
+
+    const shuffle = (input) => {
+      const arr = input.slice();
+      for (let i = arr.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+
+    const setCenter = (label) => {
+      skillsCenter.textContent = label;
+      gsap.fromTo(skillsCenter, { autoAlpha: 0.45 }, { autoAlpha: 1, duration: 0.2, overwrite: true });
+    };
+
+    const clearCenter = () => {
+      skillsCenter.textContent = defaultLabel;
+    };
+
+    const renderCards = () => {
+      floatingTweens.forEach((tween) => tween.kill());
+      floatingTweens = [];
+      skillsCanvas.querySelectorAll(".skill-card").forEach((card) => card.remove());
+      clearCenter();
+
+      const rect = skillsCanvas.getBoundingClientRect();
+      const width = Math.max(rect.width, 320);
+      const height = Math.max(rect.height, 260);
+      const cardW = window.innerWidth <= 480 ? 124 : window.innerWidth <= 820 ? 136 : 164;
+      const cardH = window.innerWidth <= 480 ? 44 : 48;
+      const maxCards = Math.max(10, Math.floor((width * height) / (cardW * cardH * 2.25)));
+      const names = shuffle(uniqueSkills).slice(0, Math.min(uniqueSkills.length, maxCards));
+      const placed = [];
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const centerRadius = Math.min(width, height) * 0.18;
+      const spacing = Math.max(86, Math.min(154, cardW * 0.76));
+
+      names.forEach((skill, index) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "skill-card";
+        card.dataset.skill = skill;
+        card.innerHTML = `<img src="${iconPool[index % iconPool.length]}" alt="" aria-hidden="true"><span>${skill}</span>`;
+
+        let x = 0;
+        let y = 0;
+        let found = false;
+
+        for (let attempt = 0; attempt < 220; attempt += 1) {
+          x = Math.random() * (width - cardW);
+          y = Math.random() * (height - cardH);
+          const cx = x + cardW / 2;
+          const cy = y + cardH / 2;
+          const awayFromCenter = Math.hypot(cx - centerX, cy - centerY) > centerRadius;
+          const awayFromOthers = placed.every((point) => Math.hypot(point.x - cx, point.y - cy) > spacing);
+
+          if (awayFromCenter && awayFromOthers) {
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) {
+          const cols = Math.max(2, Math.floor(width / (cardW + 18)));
+          const col = index % cols;
+          const row = Math.floor(index / cols);
+          x = 12 + col * ((width - cardW - 24) / Math.max(cols - 1, 1));
+          y = 14 + row * (cardH + 10);
+        }
+
+        placed.push({ x: x + cardW / 2, y: y + cardH / 2 });
+        card.style.left = `${Math.max(4, Math.min(x, width - cardW - 4))}px`;
+        card.style.top = `${Math.max(4, Math.min(y, height - cardH - 4))}px`;
+        gsap.set(card, { rotate: gsap.utils.random(-8, 8, 0.1) });
+
+        card.addEventListener("mouseenter", () => {
+          setCenter(skill);
+          card.classList.add("is-active");
+        });
+        card.addEventListener("mouseleave", () => {
+          clearCenter();
+          card.classList.remove("is-active");
+        });
+        card.addEventListener("focus", () => setCenter(skill));
+        card.addEventListener("blur", () => clearCenter());
+        card.addEventListener("click", () => {
+          setCenter(skill);
+          card.classList.add("is-active");
+          window.setTimeout(() => card.classList.remove("is-active"), 700);
+        });
+
+        skillsCanvas.appendChild(card);
+
+        floatingTweens.push(
+          gsap.to(card, {
+            x: gsap.utils.random(-11, 11, 0.1),
+            y: gsap.utils.random(-10, 10, 0.1),
+            duration: gsap.utils.random(3.2, 6, 0.1),
+            ease: "sine.inOut",
+            yoyo: true,
+            repeat: -1,
+            delay: gsap.utils.random(0, 1.5, 0.1)
+          })
+        );
+      });
+    };
+
+    renderCards();
+    skillsCanvas.addEventListener("mouseleave", clearCenter);
+    window.addEventListener("resize", () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(renderCards, 220);
+    });
+  }
 })();
