@@ -27,6 +27,7 @@
   const header = document.getElementById("top-header");
   const skillsCanvas = document.getElementById("skillsCanvas");
   const skillsCenter = document.getElementById("skillsCenter");
+  const carousels = Array.from(document.querySelectorAll("[data-carousel]"));
   const navLinks = Array.from(document.querySelectorAll(".site-nav a"));
   const sections = gsap.utils.toArray(".section");
   let lastY = window.scrollY;
@@ -138,6 +139,8 @@
     });
   });
 
+  initializeRibbonProgress();
+  initializeSolutionCarousels();
   initializeSkillsCanvas();
 
   sections.forEach((section) => {
@@ -259,6 +262,89 @@
       }
     });
   });
+
+  function initializeRibbonProgress() {
+    document.querySelectorAll(".ribbon-progress").forEach((ring) => {
+      const target = Math.max(0, Math.min(100, Number(ring.dataset.progress || 0)));
+      const state = { value: 0 };
+      ring.style.setProperty("--progress", "0%");
+
+      gsap.to(state, {
+        value: target,
+        duration: 1.15,
+        ease: "power2.out",
+        onUpdate: () => {
+          ring.style.setProperty("--progress", `${state.value}%`);
+        },
+        scrollTrigger: {
+          trigger: ring.closest(".section") || ring,
+          start: "top 82%",
+          once: true
+        }
+      });
+    });
+  }
+
+  function initializeSolutionCarousels() {
+    carousels.forEach((carousel) => {
+      const track = carousel.querySelector(".carousel-track");
+      const cards = Array.from(carousel.querySelectorAll(".solution-card"));
+      const prevBtn = carousel.querySelector(".carousel-arrow.prev");
+      const nextBtn = carousel.querySelector(".carousel-arrow.next");
+      let index = 0;
+      let timer = null;
+
+      if (!track || cards.length <= 1) {
+        if (prevBtn) {
+          prevBtn.style.display = "none";
+        }
+        if (nextBtn) {
+          nextBtn.style.display = "none";
+        }
+        return;
+      }
+
+      const move = (nextIndex) => {
+        index = (nextIndex + cards.length) % cards.length;
+        track.style.transform = `translateX(-${index * 100}%)`;
+      };
+
+      const stop = () => {
+        if (timer) {
+          window.clearInterval(timer);
+          timer = null;
+        }
+      };
+
+      const start = () => {
+        stop();
+        timer = window.setInterval(() => {
+          move(index + 1);
+        }, 4200);
+      };
+
+      if (prevBtn) {
+        prevBtn.addEventListener("click", () => {
+          move(index - 1);
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+          move(index + 1);
+        });
+      }
+
+      carousel.addEventListener("mouseenter", stop);
+      carousel.addEventListener("mouseleave", start);
+      carousel.addEventListener("focusin", stop);
+      carousel.addEventListener("focusout", start);
+      carousel.addEventListener("pointerdown", stop);
+      carousel.addEventListener("pointerup", start);
+
+      start();
+    });
+  }
 
   function initializeSkillsCanvas() {
     if (!skillsCanvas || !skillsCenter) {
